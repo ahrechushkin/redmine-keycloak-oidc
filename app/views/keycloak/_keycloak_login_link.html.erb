@@ -1,0 +1,5 @@
+<% if RedmineKeycloakOidc::SettingsHelper.enabled? %>
+  <div id="keycloak-login" style="margin-top: 1em;">
+    <%= link_to l(:label_keycloak_login), keycloak_login_path(back_url: request.params[:back_url]), class: 'keycloak-login' %>
+  </div>
+<% end %>

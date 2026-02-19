@@ -1,0 +1,9 @@
+<%= title l(:label_keycloak) %>
+
+<%= form_tag keycloak_settings_path, method: :patch, id: 'keycloak_settings_form' do %>
+  <%= render partial: 'keycloak_settings/form', locals: { settings: @settings } %>
+  <p>
+    <%= submit_tag l(:button_save) %>
+    <%= link_to l(:button_test), test_keycloak_connection_path, method: :post, class: 'icon icon-test' %>
+  </p>
+<% end %>

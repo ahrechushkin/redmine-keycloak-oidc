@@ -1,0 +1,91 @@
+<% settings = local_assigns[:settings] || @settings || {} %>
+<div class="box tabular">
+  <h3><%= l(:label_keycloak_general) %></h3>
+  <p>
+    <label><%= l(:label_keycloak_enabled) %></label>
+    <%= check_box_tag 'settings[enabled]', '1', settings['enabled'].to_s == '1' %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_jwt_api_enabled) %></label>
+    <%= check_box_tag 'settings[jwt_api_enabled]', '1', settings['jwt_api_enabled'].to_s == '1' %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_login_button_label) %></label>
+    <%= text_field_tag 'settings[login_button_label]', settings['login_button_label'], size: 50, placeholder: l(:label_keycloak_login) %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_base_url) %></label>
+    <%= text_field_tag 'settings[base_url]', settings['base_url'], size: 60, placeholder: 'https://keycloak.example.com' %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_realm) %></label>
+    <%= text_field_tag 'settings[realm]', settings['realm'].presence || 'master', size: 30 %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_client_id) %></label>
+    <%= text_field_tag 'settings[client_id]', settings['client_id'], size: 60 %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_client_secret) %></label>
+    <%= password_field_tag 'settings[client_secret]', settings['client_secret'], size: 60 %>
+    <em class="info"><%= l(:label_keycloak_client_secret_hint) %></em>
+  </p>
+</div>
+
+<div class="box tabular">
+  <h3><%= l(:label_keycloak_endpoints) %></h3>
+  <p>
+    <label><%= l(:label_keycloak_authorization_endpoint) %></label>
+    <%= text_field_tag 'settings[authorization_endpoint]', settings['authorization_endpoint'], size: 80 %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_token_endpoint) %></label>
+    <%= text_field_tag 'settings[token_endpoint]', settings['token_endpoint'], size: 80 %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_userinfo_endpoint) %></label>
+    <%= text_field_tag 'settings[userinfo_endpoint]', settings['userinfo_endpoint'], size: 80 %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_introspection_endpoint) %></label>
+    <%= text_field_tag 'settings[introspection_endpoint]', settings['introspection_endpoint'], size: 80 %>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_jwks_uri) %></label>
+    <%= text_field_tag 'settings[jwks_uri]', settings['jwks_uri'], size: 80 %>
+  </p>
+</div>
+
+<div class="box tabular">
+  <h3><%= l(:label_keycloak_jwt_options) %></h3>
+  <p>
+    <label><%= l(:label_keycloak_jwt_before_api_key) %></label>
+    <%= check_box_tag 'settings[jwt_before_api_key]', '1', settings['jwt_before_api_key'].to_s != '0' %>
+  </p>
+</div>
+
+<div class="box tabular">
+  <h3><%= l(:label_keycloak_group_mapping) %></h3>
+  <p>
+    <label><%= l(:label_keycloak_group_claim) %></label>
+    <%= text_field_tag 'settings[group_claim]', settings['group_claim'].presence || 'realm_access.roles', size: 40 %>
+    <em class="info"><%= l(:label_keycloak_group_claim_hint) %></em>
+  </p>
+  <p>
+    <label><%= l(:label_keycloak_group_rules) %></label>
+    <em class="info"><%= l(:label_keycloak_group_rules_hint) %></em>
+  </p>
+  <p id="group_mapping_rules_rows">
+    <% rules = settings['group_mapping_rules'] || []; rules = [{}] if rules.empty? %>
+    <% rules.each do |rule| %>
+      <span class="group-rule-row" style="display:block; margin-bottom:4px;">
+        <%= text_field_tag 'settings[group_rule_patterns][]', rule['pattern'], size: 40, placeholder: '*.admin or ACC.*' %>
+        <%= select_tag 'settings[group_rule_group_ids][]', options_from_collection_for_select(Group.sorted, :id, :name, rule['group_id']), include_blank: true %>
+      </span>
+    <% end %>
+    <span class="group-rule-row" style="display:block; margin-bottom:4px;">
+      <%= text_field_tag 'settings[group_rule_patterns][]', nil, size: 40, placeholder: '*.admin or ACC.*' %>
+      <%= select_tag 'settings[group_rule_group_ids][]', options_from_collection_for_select(Group.sorted, :id, :name), include_blank: true %>
+    </span>
+  </p>
+</div>
