@@ -4,7 +4,7 @@ module RedmineKeycloakOidc
   class GroupSync
     class << self
       def sync(user, claims, first_login: false)
-        settings = RedmineKeycloakOidc::SettingsHelper.raw_hash
+        settings = RedmineKeycloakOidc::SettingsHelper.effective_hash
         group_claim = settings['group_claim'].to_s.presence || 'realm_access.roles'
         values = extract_claim_value(claims, group_claim)
         return if values.blank?

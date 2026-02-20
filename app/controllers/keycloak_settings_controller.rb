@@ -35,7 +35,7 @@ class KeycloakSettingsController < ApplicationController
   end
 
   def test_connection
-    settings = RedmineKeycloakOidc::SettingsHelper.raw_hash
+    settings = RedmineKeycloakOidc::SettingsHelper.effective_hash
     intro = settings['introspection_endpoint'].to_s
     if intro.present?
       uri = URI(intro)
@@ -80,7 +80,7 @@ class KeycloakSettingsController < ApplicationController
   private
 
   def settings_hash
-    s = RedmineKeycloakOidc::SettingsHelper.raw_hash
+    s = RedmineKeycloakOidc::SettingsHelper.effective_hash
     s['client_secret'] = '' if s['client_secret'].present?
     if s['group_mapping_rules'].blank? && s['group_mapping'].present?
       s['group_mapping_rules'] = s['group_mapping'].map { |pattern, gid| { 'priority' => 10, 'pattern' => pattern.to_s, 'group_id' => gid.to_i } }

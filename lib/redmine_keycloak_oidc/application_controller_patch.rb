@@ -27,8 +27,8 @@ module RedmineKeycloakOidc
     end
 
     def jwt_before_api_key?
-      s = Setting.plugin_redmine_keycloak_oidc
-      s.is_a?(Hash) && s['jwt_before_api_key'].to_s != '0'
+      s = RedmineKeycloakOidc::SettingsHelper.effective_hash
+      s['jwt_before_api_key'].to_s != '0'
     end
 
     def bearer_token

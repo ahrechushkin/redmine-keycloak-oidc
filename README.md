@@ -54,6 +54,36 @@ Go to **Administration → Keycloak** and:
 
 Users are created on first login and synced (attributes and groups) on each login. API requests with `Authorization: Bearer <JWT>` use introspection or JWKS to resolve the user and sync groups.
 
+## Configuration via environment variables
+
+You can pre-fill settings and enable Keycloak using environment variables. Set variables before starting Redmine; they override the values stored in the database (Administration → Keycloak). Useful for Docker, Kubernetes, or automated deployments.
+
+| Variable | Description |
+|----------|-------------|
+| `KEYCLOAK_ENABLED` | Enable web login. Use `1`, `true`, or `yes` (case-insensitive). |
+| `KEYCLOAK_JWT_API_ENABLED` | Enable JWT API authentication. Use `1`, `true`, or `yes`. |
+| `KEYCLOAK_JWT_BEFORE_API_KEY` | Check JWT before API key. Any non-empty value enables. |
+| `KEYCLOAK_BASE_URL` | Keycloak server base URL (e.g. `https://keycloak.example.com/realms/my-realm`). |
+| `KEYCLOAK_REALM` | Realm name (default in UI: `master`). |
+| `KEYCLOAK_CLIENT_ID` | Client ID. |
+| `KEYCLOAK_CLIENT_SECRET` | Client secret (plain text; avoid logging). |
+| `KEYCLOAK_GROUP_CLAIM` | Claim path for groups (e.g. `realm_access.roles`, `groups`). |
+| `KEYCLOAK_LOGIN_BUTTON_LABEL` | Custom label for the Keycloak login button. |
+| `KEYCLOAK_AUTHORIZATION_ENDPOINT` | Authorization endpoint URL. |
+| `KEYCLOAK_TOKEN_ENDPOINT` | Token endpoint URL. |
+| `KEYCLOAK_USERINFO_ENDPOINT` | Userinfo endpoint URL. |
+| `KEYCLOAK_INTROSPECTION_ENDPOINT` | Introspection endpoint URL (JWT API). |
+| `KEYCLOAK_JWKS_URI` | JWKS URI (optional, for JWT verification). |
+| `KEYCLOAK_GROUP_MAPPING_RULES` | JSON array of mapping rules (see below). |
+
+**Group mapping from ENV:** set `KEYCLOAK_GROUP_MAPPING_RULES` to a JSON array of objects with `pattern`, `group_id`, and optional `priority` (default 10). Example:
+
+```json
+[{"pattern": "*.admin", "group_id": 2, "priority": 10}, {"pattern": "users", "group_id": 3}]
+```
+
+If both database rules and `KEYCLOAK_GROUP_MAPPING_RULES` are present, the environment value is used. The form in Administration → Keycloak shows the effective values (database merged with ENV); saving the form only writes to the database and does not change environment variables.
+
 ## API usage with JWT
 
 Send the access token in the request:

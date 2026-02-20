@@ -7,7 +7,7 @@ require 'json'
 module RedmineKeycloakOidc
   class OidcClient
     def initialize(settings = nil)
-      @settings = settings || RedmineKeycloakOidc::SettingsHelper.raw_hash
+      @settings = settings || RedmineKeycloakOidc::SettingsHelper.effective_hash
     end
 
     def authorization_url(redirect_uri, state)

@@ -8,7 +8,7 @@ module RedmineKeycloakOidc
 
     def authenticate(token)
       claims = nil
-      settings = RedmineKeycloakOidc::SettingsHelper.raw_hash
+      settings = RedmineKeycloakOidc::SettingsHelper.effective_hash
       intro_endpoint = settings['introspection_endpoint'].to_s
       if intro_endpoint.present?
         claims = introspect(token, intro_endpoint, settings)

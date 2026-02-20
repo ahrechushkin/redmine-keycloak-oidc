@@ -1,5 +1,6 @@
 en:
   label_keycloak: "Keycloak"
+  label_keycloak_env_hint: "Settings can be pre-filled or overridden by environment variables (KEYCLOAK_*). See plugin README."
   label_keycloak_general: "General"
   label_keycloak_enabled: "Enable Keycloak web login"
   label_keycloak_jwt_api_enabled: "Enable JWT API authentication"
