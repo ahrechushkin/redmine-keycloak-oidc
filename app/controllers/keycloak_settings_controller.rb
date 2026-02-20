@@ -21,11 +21,13 @@ class KeycloakSettingsController < ApplicationController
       :authorization_endpoint, :token_endpoint, :userinfo_endpoint,
       :introspection_endpoint, :jwks_uri,
       :group_claim, :jwt_before_api_key,
-      group_rule_patterns: [], group_rule_group_ids: []
+      group_rule_priorities: [], group_rule_patterns: [], group_rule_group_ids: []
     ).to_h
+    priorities = permitted.delete('group_rule_priorities') || []
     patterns = permitted.delete('group_rule_patterns') || []
     group_ids = permitted.delete('group_rule_group_ids') || []
-    permitted['group_mapping_rules'] = patterns.zip(group_ids).reject { |p, g| p.blank? || g.blank? }.map { |p, g| { 'pattern' => p.strip, 'group_id' => g.to_i } }
+    triples = priorities.zip(patterns, group_ids).reject { |_pr, p, g| p.blank? || g.blank? }
+    permitted['group_mapping_rules'] = triples.map { |pr, p, g| { 'priority' => (pr.blank? ? 10 : pr.to_i), 'pattern' => p.strip, 'group_id' => g.to_i } }
 
     RedmineKeycloakOidc::SettingsHelper.save(permitted)
     flash[:notice] = l(:notice_successful_update)
@@ -81,7 +83,7 @@ class KeycloakSettingsController < ApplicationController
     s = RedmineKeycloakOidc::SettingsHelper.raw_hash
     s['client_secret'] = '' if s['client_secret'].present?
     if s['group_mapping_rules'].blank? && s['group_mapping'].present?
-      s['group_mapping_rules'] = s['group_mapping'].map { |pattern, gid| { 'pattern' => pattern.to_s, 'group_id' => gid.to_i } }
+      s['group_mapping_rules'] = s['group_mapping'].map { |pattern, gid| { 'priority' => 10, 'pattern' => pattern.to_s, 'group_id' => gid.to_i } }
     end
     s
   end

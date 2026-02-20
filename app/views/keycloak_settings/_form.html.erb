@@ -64,28 +64,102 @@
   </p>
 </div>
 
-<div class="box tabular">
+<div class="box tabular" id="keycloak_group_mapping_section">
   <h3><%= l(:label_keycloak_group_mapping) %></h3>
+
   <p>
-    <label><%= l(:label_keycloak_group_claim) %></label>
-    <%= text_field_tag 'settings[group_claim]', settings['group_claim'].presence || 'realm_access.roles', size: 40 %>
+    <label for="settings_group_claim"><%= l(:label_keycloak_group_claim) %></label>
+    <%= text_field_tag 'settings[group_claim]', settings['group_claim'].presence || 'realm_access.roles', size: 50, id: 'settings_group_claim' %>
     <em class="info"><%= l(:label_keycloak_group_claim_hint) %></em>
   </p>
-  <p>
-    <label><%= l(:label_keycloak_group_rules) %></label>
+
+  <p class="keycloak-rules-help">
     <em class="info"><%= l(:label_keycloak_group_rules_hint) %></em>
+    <em class="info"><%= l(:label_keycloak_priority_hint) %></em>
   </p>
-  <p id="group_mapping_rules_rows">
-    <% rules = settings['group_mapping_rules'] || []; rules = [{}] if rules.empty? %>
-    <% rules.each do |rule| %>
-      <span class="group-rule-row" style="display:block; margin-bottom:4px;">
-        <%= text_field_tag 'settings[group_rule_patterns][]', rule['pattern'], size: 40, placeholder: '*.admin or ACC.*' %>
-        <%= select_tag 'settings[group_rule_group_ids][]', options_from_collection_for_select(Group.sorted, :id, :name, rule['group_id']), include_blank: true %>
-      </span>
-    <% end %>
-    <span class="group-rule-row" style="display:block; margin-bottom:4px;">
-      <%= text_field_tag 'settings[group_rule_patterns][]', nil, size: 40, placeholder: '*.admin or ACC.*' %>
-      <%= select_tag 'settings[group_rule_group_ids][]', options_from_collection_for_select(Group.sorted, :id, :name), include_blank: true %>
-    </span>
+
+  <div class="keycloak-rules-toolbar" style="margin-bottom: 8px;">
+    <%= link_to l(:label_keycloak_add_rule), '#', id: 'keycloak_add_rule', class: 'icon icon-add' %>
+  </div>
+
+  <table class="list keycloak-group-rules">
+    <thead>
+      <tr>
+        <th style="width: 8%;" title="<%= l(:label_keycloak_priority_hint) %>"><%= l(:label_keycloak_column_priority) %></th>
+        <th style="width: 38%;"><%= l(:label_keycloak_column_pattern) %></th>
+        <th style="width: 38%;"><%= l(:label_keycloak_column_redmine_group) %></th>
+        <th style="width: 8%;"></th>
+      </tr>
+    </thead>
+    <tbody id="group_mapping_rules_rows">
+      <% rules = settings['group_mapping_rules'] || []; rules = [{}] if rules.empty? %>
+      <% rules.each do |rule| %>
+        <tr class="group-rule-row">
+          <td>
+            <%= number_field_tag 'settings[group_rule_priorities][]', rule['priority'].presence || 10, min: 1, max: 9999, size: 4, class: 'group-rule-priority', style: 'width: 4em;', title: l(:label_keycloak_priority_hint) %>
+          </td>
+          <td>
+            <%= text_field_tag 'settings[group_rule_patterns][]', rule['pattern'], size: 38, placeholder: l(:label_keycloak_pattern_placeholder), class: 'group-rule-pattern', style: 'width: 95%;' %>
+          </td>
+          <td>
+            <%= select_tag 'settings[group_rule_group_ids][]', options_from_collection_for_select(Group.sorted, :id, :name, rule['group_id']), include_blank: "— #{l(:label_none)} —", class: 'group-rule-group', style: 'width: 95%;' %>
+          </td>
+          <td class="buttons">
+            <button type="button" class="group-rule-remove icon icon-del" title="<%= l(:button_delete) %>" aria-label="<%= l(:button_delete) %>"><%= sprite_icon('del', l(:button_delete), icon_only: true) %></button>
+          </td>
+        </tr>
+      <% end %>
+      <tr id="group_rule_template" class="group-rule-row" style="display: none;">
+        <td>
+          <input type="number" name="settings[group_rule_priorities][]" value="10" min="1" max="9999" size="4" class="group-rule-priority" style="width: 4em;" disabled title="<%= l(:label_keycloak_priority_hint) %>" />
+        </td>
+        <td>
+          <input type="text" name="settings[group_rule_patterns][]" size="38" class="group-rule-pattern" placeholder="<%= l(:label_keycloak_pattern_placeholder) %>" disabled style="width: 95%;" />
+        </td>
+        <td>
+          <select name="settings[group_rule_group_ids][]" class="group-rule-group" disabled style="width: 95%;">
+            <option value=""><%= l(:label_none) %></option>
+            <%= options_from_collection_for_select(Group.sorted, :id, :name, nil) %>
+          </select>
+        </td>
+        <td class="buttons">
+          <button type="button" class="group-rule-remove icon icon-del" title="<%= l(:button_delete) %>" aria-label="<%= l(:button_delete) %>"><%= sprite_icon('del', l(:button_delete), icon_only: true) %></button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p id="keycloak_rules_empty" class="keycloak-rules-empty" style="<%= rules.any? ? 'display: none;' : '' %> margin-top: 12px; padding: 12px; background: #f8f8f8; border-radius: 4px; color: #666;">
+    <%= l(:label_keycloak_no_rules) %>
   </p>
 </div>
+
+<script>
+(function() {
+  var section = document.getElementById('keycloak_group_mapping_section');
+  var tbody = document.getElementById('group_mapping_rules_rows');
+  var template = document.getElementById('group_rule_template');
+  var addBtn = document.getElementById('keycloak_add_rule');
+  var emptyMsg = document.getElementById('keycloak_rules_empty');
+  if (!section || !tbody || !template || !addBtn) return;
+
+  addBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    var clone = template.cloneNode(true);
+    clone.id = '';
+    clone.style.display = '';
+    clone.querySelectorAll('input, select').forEach(function(el) { el.disabled = false; });
+    tbody.insertBefore(clone, template);
+    if (emptyMsg) emptyMsg.style.display = 'none';
+  });
+
+  section.addEventListener('click', function(e) {
+    if (!e.target || !e.target.classList.contains('group-rule-remove')) return;
+    var row = e.target.closest('tr.group-rule-row');
+    if (!row || row.id === 'group_rule_template') return;
+    row.remove();
+    var dataRows = tbody.querySelectorAll('tr.group-rule-row:not(#group_rule_template)');
+    if (emptyMsg && dataRows.length === 0) emptyMsg.style.display = '';
+  });
+})();
+</script>
