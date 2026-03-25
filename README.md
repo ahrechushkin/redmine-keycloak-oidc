@@ -104,3 +104,8 @@ The plugin validates the token via the **introspection** endpoint (derived or co
 If introspection returns `active: false` (e.g. wrong client or realm policy), check Redmine logs for `[redmine_keycloak_oidc]` warnings. Tokens issued for another OAuth client in the same realm are usually accepted by introspection when using your Redmine confidential client credentials; if not, adjust Keycloak client policies or obtain a token for the Redmine client.
 
 Optional **JWKS URI** enables a fallback path (limited validation); prefer introspection for production.
+
+### Troubleshooting
+
+- **`GET /issues` (HTML) with Bearer** — not a Redmine REST request; `api_request?` is false, JWT is not used. Use **`/issues.json`** (or `.xml`, or `?format=json`) **and** `Authorization: Bearer …`.
+- **`Current user: anonymous` on `*.json`** — enable **JWT API authentication** in Administration → Keycloak, enable **REST API** in Redmine settings, and ensure the request includes a Bearer access token (some proxies strip `Authorization`; the plugin also reads `HTTP_AUTHORIZATION`).
