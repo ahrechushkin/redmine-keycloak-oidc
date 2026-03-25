@@ -75,7 +75,51 @@ module RedmineKeycloakOidc
         get('jwt_api_enabled').to_s == '1'
       end
 
+      # Issuer URL used to build standard Keycloak OIDC paths when endpoints are left blank.
+      # Priority: explicit base_url+realm, or derive from userinfo/token/authorization URL.
+      def effective_issuer_url
+        from_base = issuer_from_base_and_realm
+        return from_base if from_base.present?
+
+        %w[userinfo_endpoint token_endpoint authorization_endpoint].each do |key|
+          iss = issuer_from_oidc_endpoint(get(key))
+          return iss if iss.present?
+        end
+        ''
+      end
+
+      # Introspection URL: setting or {issuer}/protocol/openid-connect/token/introspect
+      def effective_introspection_endpoint
+        ex = get('introspection_endpoint').to_s.strip
+        return ex if ex.present?
+
+        iss = effective_issuer_url
+        return '' if iss.blank?
+
+        "#{iss}/protocol/openid-connect/token/introspect"
+      end
+
       private
+
+      def issuer_from_base_and_realm
+        base = get('base_url').to_s.strip.chomp('/')
+        return '' if base.blank?
+
+        return base if base.include?('/realms/')
+
+        realm = get('realm').presence || 'master'
+        "#{base}/realms/#{realm}"
+      end
+
+      def issuer_from_oidc_endpoint(url)
+        s = url.to_s.strip
+        return '' if s.blank?
+
+        idx = s.index('/protocol/openid-connect')
+        return '' unless idx
+
+        s[0...idx]
+      end
 
       def parse_group_mapping_rules_env(json_str)
         arr = JSON.parse(json_str)

@@ -9,7 +9,7 @@ module RedmineKeycloakOidc
     def authenticate(token)
       claims = nil
       settings = RedmineKeycloakOidc::SettingsHelper.effective_hash
-      intro_endpoint = settings['introspection_endpoint'].to_s
+      intro_endpoint = RedmineKeycloakOidc::SettingsHelper.effective_introspection_endpoint
       if intro_endpoint.present?
         claims = introspect(token, intro_endpoint, settings)
       end
@@ -35,27 +35,49 @@ module RedmineKeycloakOidc
     private
 
     def introspect(token, endpoint, settings)
+      if settings['client_id'].to_s.blank?
+        log_warn('JWT introspection skipped: client_id is blank')
+        return nil
+      end
+      if RedmineKeycloakOidc::SettingsHelper.client_secret.to_s.blank?
+        log_warn('JWT introspection skipped: client_secret is blank')
+        return nil
+      end
       client_secret = RedmineKeycloakOidc::SettingsHelper.client_secret
       body = {
         token: token,
         client_id: settings['client_id'],
         client_secret: client_secret
       }
-      resp = post_form(endpoint, body)
-      return nil unless resp.is_a?(Hash) && resp['active'] == true
+      resp = post_form(endpoint, body, context: 'introspect')
+      unless resp.is_a?(Hash)
+        log_warn("JWT introspection: no JSON response from #{endpoint}")
+        return nil
+      end
+      unless resp['active'] == true
+        log_warn('JWT introspection: token not active')
+        return nil
+      end
       resp
     end
 
-    def post_form(url, form_data)
+    def post_form(url, form_data, context: 'post_form')
       uri = URI(url)
       req = Net::HTTP::Post.new(uri)
       req['Accept'] = 'application/json'
       req.content_type = 'application/x-www-form-urlencoded'
       req.body = URI.encode_www_form(form_data)
       resp = do_http(uri, req)
-      return nil unless resp.is_a?(Net::HTTPSuccess)
+      unless resp.is_a?(Net::HTTPSuccess)
+        log_warn("#{context}: HTTP #{resp.code} from #{uri.scheme}://#{uri.host}#{uri.path}")
+        return nil
+      end
       JSON.parse(resp.body)
-    rescue JSON::ParserError, StandardError
+    rescue JSON::ParserError => e
+      log_warn("#{context}: invalid JSON — #{e.class}")
+      nil
+    rescue StandardError => e
+      log_warn("#{context}: #{e.class} — #{e.message}")
       nil
     end
 
@@ -89,6 +111,12 @@ module RedmineKeycloakOidc
       user.firstname = claims['given_name'] if claims['given_name'].present?
       user.lastname = claims['family_name'] if claims['family_name'].present?
       user.mail = claims['email'] if claims['email'].present?
+    end
+
+    def log_warn(message)
+      return unless defined?(Rails) && Rails.logger
+
+      Rails.logger.warn("[redmine_keycloak_oidc] #{message}")
     end
   end
 end
