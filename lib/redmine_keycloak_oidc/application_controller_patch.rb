@@ -3,13 +3,15 @@
 module RedmineKeycloakOidc
   module ApplicationControllerPatch
     def find_current_user
-      if jwt_before_api_key?
+      # Keycloak JWT is not a Doorkeeper row; resolve it before super (API key, Doorkeeper, Basic).
+      if jwt_try_before_super?
         user = find_current_user_via_jwt
         return user if user
       end
       u = super
       return u if u
       return nil unless jwt_api_enabled?
+
       find_current_user_via_jwt
     end
 
@@ -18,9 +20,16 @@ module RedmineKeycloakOidc
     def find_current_user_via_jwt
       return nil unless jwt_api_request?
       return nil unless accept_api_auth?
-      return nil unless jwt_api_enabled?
 
       token = bearer_token
+
+      unless jwt_api_enabled?
+        if token.present? && logger
+          logger.warn('[redmine_keycloak_oidc] JWT API disabled; Bearer token ignored (Administration → Keycloak or KEYCLOAK_JWT_API_ENABLED)')
+        end
+        return nil
+      end
+
       return nil if token.blank?
 
       RedmineKeycloakOidc::JwtAuth.authenticate(token)
@@ -31,7 +40,12 @@ module RedmineKeycloakOidc
       s['jwt_before_api_key'].to_s != '0'
     end
 
-    # Redmine's api_request? only checks params[:format]; JSON/XML via Accept may set request.format only.
+    def jwt_try_before_super?
+      return true if jwt_before_api_key?
+
+      jwt_api_enabled? && jwt_api_request? && accept_api_auth? && bearer_token.present?
+    end
+
     def jwt_api_request?
       return true if api_request?
 

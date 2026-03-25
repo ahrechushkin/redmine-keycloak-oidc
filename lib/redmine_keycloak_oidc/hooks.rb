@@ -6,6 +6,8 @@ module RedmineKeycloakOidc
       def bootstrap
         require_relative 'jwt_auth'
         require_relative 'application_controller_patch'
+        return if ApplicationController.ancestors.include?(RedmineKeycloakOidc::ApplicationControllerPatch)
+
         ApplicationController.prepend(RedmineKeycloakOidc::ApplicationControllerPatch)
       end
     end

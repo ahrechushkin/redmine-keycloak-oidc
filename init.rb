@@ -3,10 +3,7 @@
 require File.join(__dir__, 'lib', 'redmine_keycloak_oidc')
 require File.join(__dir__, 'lib', 'redmine_keycloak_oidc', 'settings_helper')
 require File.join(__dir__, 'lib', 'redmine_keycloak_oidc', 'keycloak_login_hook')
-
-Rails.application.config.to_prepare do
-  RedmineKeycloakOidc::Hooks.bootstrap
-end
+require File.join(__dir__, 'lib', 'redmine_keycloak_oidc', 'hooks')
 
 Redmine::Plugin.register :redmine_keycloak_oidc do
   name 'Redmine Keycloak OIDC'
@@ -34,6 +31,10 @@ Redmine::Plugin.register :redmine_keycloak_oidc do
     'jwt_before_api_key' => '1'
   }, partial: 'keycloak_settings/form'
 end
+
+# Ensure patch is applied in all environments.
+RedmineKeycloakOidc::Hooks.bootstrap
+Rails.application.config.to_prepare { RedmineKeycloakOidc::Hooks.bootstrap }
 
 Redmine::MenuManager.map :admin_menu do |menu|
   menu.push :keycloak_settings,

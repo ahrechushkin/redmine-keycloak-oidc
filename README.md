@@ -1,6 +1,6 @@
 # Redmine Keycloak OIDC Plugin
 
-Integrates Redmine with Keycloak: web login via OIDC, API authentication with JWT (introspection or JWKS), and group mapping from JWT claims.
+Integrates Redmine with Keycloak: web login via OIDC, API authentication with JWT (introspection or optional JWKS fallback), and group mapping from JWT claims.
 
 ## Installation
 
@@ -19,93 +19,65 @@ Integrates Redmine with Keycloak: web login via OIDC, API authentication with JW
    - **Client authentication**: ON (confidential client).
    - **Valid redirect URIs**: your Redmine callback URL, e.g. `https://redmine.example.com/auth/keycloak/callback`.
    - **Web origins**: your Redmine base URL if needed.
-3. In the client, note **Client ID** and **Client secret** (Credentials tab).
+3. Note **Client ID** and **Client secret** (Credentials tab).
 
 ### Endpoints
 
-Set **Base URL** (either full realm URL `https://keycloak.example.com/realms/your-realm` or host only `https://keycloak.example.com` plus **Realm** field), or set each endpoint manually.
+Set **Base URL** (full realm URL `https://keycloak.example.com/realms/your-realm` or host `https://keycloak.example.com` plus **Realm** in the form), or set each endpoint manually.
 
-For **JWT API**, if **Introspection endpoint** is left empty, the plugin builds the standard Keycloak URL:
+If **Introspection endpoint** is empty, the plugin uses Keycloak’s default path:
 
-`{issuer}/protocol/openid-connect/token/introspect`, where `issuer` is derived from Base URL + Realm, or from your **Userinfo** / **Token** / **Authorization** endpoint (everything before `/protocol/openid-connect/...`).
+`{issuer}/protocol/openid-connect/token/introspect`
 
-Other endpoints:
+where **issuer** comes from Base URL + Realm, or from **Userinfo** / **Token** / **Authorization** URL (the part before `/protocol/openid-connect/`).
 
-- **Authorization endpoint**: e.g. `https://keycloak.example.com/realms/your-realm/protocol/openid-connect/auth`
-- **Token endpoint**: `.../protocol/openid-connect/token`
-- **Userinfo endpoint**: `.../protocol/openid-connect/userinfo`
-- **Introspection endpoint** (JWT API): optional if issuer can be derived as above
-- **JWKS URI** (optional): only needed if you use the optional unsigned-JWT fallback path; not auto-filled for security reasons
+- **JWKS URI** is optional and only used if you enable the unsigned-JWT fallback; introspection is recommended for production.
 
 ### Redirect URI
 
-Register in the client exactly:
+Register in the client:
 
 `https://your-redmine-host/auth/keycloak/callback`
 
-(Use `http` and the correct port if not using HTTPS. If Redmine uses a relative URL root, include it, e.g. `/redmine/auth/keycloak/callback`.)
+(Include relative URL root if needed, e.g. `/redmine/auth/keycloak/callback`.)
 
 ## Redmine configuration
 
-Go to **Administration → Keycloak** and:
-
-**Note:** The "Login with Keycloak" button on the login page appears only when **"Enable Keycloak web login"** is checked. If you don't see it, enable that option and reload the login page.
+**Administration → Keycloak**
 
 1. Enable **Keycloak web login** and/or **JWT API authentication**.
-2. Fill **Keycloak server URL**, **Realm**, **Client ID**, **Client secret**.
-3. Fill endpoints; for JWT API, **Introspection** can stay empty if Base URL (or realm) + Userinfo/Token/Auth URL allow deriving the issuer.
-4. **Group claim**: claim path for groups/roles (e.g. `realm_access.roles` or `groups`).
-5. **Group mapping rules**: pattern → Redmine group. Use `*` as wildcard: `*.admin` matches any role ending in `.admin` (e.g. ACC.admin, PROJECT.admin), `ACC.*` matches all ACC roles. You can add multiple rules; the list of roles in Keycloak can change without reconfiguring each one.
-6. **Login button text**: optional custom label for the Keycloak login button (empty = default "Login with Keycloak").
+2. Set **Base URL**, **Realm**, **Client ID**, **Client secret**.
+3. Endpoints can be left partial if issuer is derivable (see above).
+4. **Group claim** and **group mapping rules** as needed.
 
-Users are created on first login and synced (attributes and groups) on each login. API requests with `Authorization: Bearer <JWT>` use introspection or JWKS to resolve the user and sync groups.
+Enable **REST API** in Redmine global settings when using the API.
 
 ## Configuration via environment variables
 
-You can pre-fill settings and enable Keycloak using environment variables. Set variables before starting Redmine; they override the values stored in the database (Administration → Keycloak). Useful for Docker, Kubernetes, or automated deployments.
-
 | Variable | Description |
 |----------|-------------|
-| `KEYCLOAK_ENABLED` | Enable web login. Use `1`, `true`, or `yes` (case-insensitive). |
-| `KEYCLOAK_JWT_API_ENABLED` | Enable JWT API authentication. Use `1`, `true`, or `yes`. |
-| `KEYCLOAK_JWT_BEFORE_API_KEY` | Check JWT before API key. Any non-empty value enables. |
-| `KEYCLOAK_BASE_URL` | Keycloak server base URL (e.g. `https://keycloak.example.com/realms/my-realm`). |
+| `KEYCLOAK_ENABLED` | Web login: `1`, `true`, or `yes`. |
+| `KEYCLOAK_JWT_API_ENABLED` | JWT API: `1`, `true`, or `yes`. |
+| `KEYCLOAK_JWT_BEFORE_API_KEY` | Non-empty value enables checking JWT before API key (default in UI is on). |
+| `KEYCLOAK_BASE_URL` | Keycloak base / realm URL. |
 | `KEYCLOAK_REALM` | Realm name (default in UI: `master`). |
 | `KEYCLOAK_CLIENT_ID` | Client ID. |
-| `KEYCLOAK_CLIENT_SECRET` | Client secret (plain text; avoid logging). |
-| `KEYCLOAK_GROUP_CLAIM` | Claim path for groups (e.g. `realm_access.roles`, `groups`). |
-| `KEYCLOAK_LOGIN_BUTTON_LABEL` | Custom label for the Keycloak login button. |
-| `KEYCLOAK_AUTHORIZATION_ENDPOINT` | Authorization endpoint URL. |
-| `KEYCLOAK_TOKEN_ENDPOINT` | Token endpoint URL. |
-| `KEYCLOAK_USERINFO_ENDPOINT` | Userinfo endpoint URL. |
-| `KEYCLOAK_INTROSPECTION_ENDPOINT` | Introspection endpoint URL (JWT API). |
-| `KEYCLOAK_JWKS_URI` | JWKS URI (optional, for JWT verification). |
-| `KEYCLOAK_GROUP_MAPPING_RULES` | JSON array of mapping rules (see below). |
-
-**Group mapping from ENV:** set `KEYCLOAK_GROUP_MAPPING_RULES` to a JSON array of objects with `pattern`, `group_id`, and optional `priority` (default 10). Example:
-
-```json
-[{"pattern": "*.admin", "group_id": 2, "priority": 10}, {"pattern": "users", "group_id": 3}]
-```
-
-If both database rules and `KEYCLOAK_GROUP_MAPPING_RULES` are present, the environment value is used. The form in Administration → Keycloak shows the effective values (database merged with ENV); saving the form only writes to the database and does not change environment variables.
+| `KEYCLOAK_CLIENT_SECRET` | Client secret. |
+| `KEYCLOAK_GROUP_CLAIM` | Claim path for groups. |
+| `KEYCLOAK_*_ENDPOINT` | Override OIDC endpoints if needed. |
+| `KEYCLOAK_GROUP_MAPPING_RULES` | JSON array of `{ "pattern", "group_id", "priority" }`. |
 
 ## API usage with JWT
 
-Send the access token in the request:
-
 ```http
 GET /issues.json
-Authorization: Bearer <your_keycloak_access_token>
+Authorization: Bearer <keycloak_access_token>
 ```
 
-The plugin validates the token via the **introspection** endpoint (derived or configured) using the same **Client ID** and **Client secret** as web login. Ensure **JWT API authentication** is enabled in Administration → Keycloak, and **REST API** is enabled in Redmine global settings.
-
-If introspection returns `active: false` (e.g. wrong client or realm policy), check Redmine logs for `[redmine_keycloak_oidc]` warnings. Tokens issued for another OAuth client in the same realm are usually accepted by introspection when using your Redmine confidential client credentials; if not, adjust Keycloak client policies or obtain a token for the Redmine client.
-
-Optional **JWKS URI** enables a fallback path (limited validation); prefer introspection for production.
+The plugin validates the token via **introspection** (same **client_id** / **client_secret** as web login). Check `log/production.log` (or `development.log`) for lines prefixed with `[redmine_keycloak_oidc]` if something fails.
 
 ### Troubleshooting
 
-- **`GET /issues` (HTML) with Bearer** — not a Redmine REST request; `api_request?` is false, JWT is not used. Use **`/issues.json`** (or `.xml`, or `?format=json`) **and** `Authorization: Bearer …`.
-- **`Current user: anonymous` on `*.json`** — enable **JWT API authentication** in Administration → Keycloak, enable **REST API** in Redmine settings, and ensure the request includes a Bearer access token (some proxies strip `Authorization`; the plugin also reads `HTTP_AUTHORIZATION`).
+- Use **`/issues.json`** (or `.xml` / `?format=json`) — plain `/issues` is not a REST API request for Redmine.
+- **`Doorkeeper::AccessToken` in logs** — Redmine looks up Bearer tokens in its own OAuth table; Keycloak tokens are not there. This plugin runs **before** that when JWT API is enabled and a Bearer token is present.
+- **401** — Enable **JWT API** in Administration → Keycloak; ensure **REST API** is enabled; send a valid Keycloak access token; configure **Base URL** / introspection so validation can reach Keycloak.

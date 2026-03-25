@@ -10,26 +10,45 @@ module RedmineKeycloakOidc
       claims = nil
       settings = RedmineKeycloakOidc::SettingsHelper.effective_hash
       intro_endpoint = RedmineKeycloakOidc::SettingsHelper.effective_introspection_endpoint
+      jwks_explicit = settings['jwks_uri'].to_s
+
+      if intro_endpoint.blank? && jwks_explicit.blank?
+        log_warn(
+          'Cannot validate JWT: no introspection URL and no JWKS URI. Set Keycloak Base URL + realm (or userinfo/token URL), or KEYCLOAK_INTROSPECTION_ENDPOINT'
+        )
+        return nil
+      end
+
       if intro_endpoint.present?
         claims = introspect(token, intro_endpoint, settings)
       end
-      if claims.blank? && settings['jwks_uri'].to_s.present?
-        claims = verify_jwt_with_jwks(token, settings['jwks_uri'])
+      if claims.blank? && jwks_explicit.present?
+        claims = verify_jwt_with_jwks(token, jwks_explicit)
       end
       return nil if claims.blank?
       login_str = claims['preferred_username'].presence || claims['username'].presence || claims['sub'].to_s
-      return nil if login_str.blank?
+      if login_str.blank?
+        log_warn('JWT claims contain no preferred_username, username, or sub')
+        return nil
+      end
       user = User.find_by_login(login_str)
       if user.nil?
         user = build_user_from_claims(login_str, claims)
-        return nil unless user.save
+        unless user.save
+          log_warn("Could not create user from JWT: #{user.errors.full_messages.join(', ')}")
+          return nil
+        end
         RedmineKeycloakOidc::GroupSync.sync(user, claims, first_login: true)
       else
         update_user_from_claims(user, claims)
         user.save if user.changed?
         RedmineKeycloakOidc::GroupSync.sync(user, claims, first_login: false)
       end
-      user&.active? ? user : nil
+      unless user&.active?
+        log_warn("JWT user '#{user&.login}' is not active")
+        return nil
+      end
+      user
     end
 
     private
@@ -83,11 +102,20 @@ module RedmineKeycloakOidc
 
     def verify_jwt_with_jwks(token, jwks_uri)
       payload = RedmineKeycloakOidc::JwtDecoder.decode_unsigned(token)
-      return nil if payload.blank?
+      if payload.blank?
+        log_warn('JWT (JWKS fallback): could not decode token payload')
+        return nil
+      end
       exp = payload['exp']
-      return nil if exp && Time.at(exp.to_i) < Time.now
+      if exp && Time.at(exp.to_i) < Time.now
+        log_warn('JWT (JWKS fallback): token expired')
+        return nil
+      end
       login_str = payload['preferred_username'].presence || payload['sub'].to_s
-      return nil if login_str.blank?
+      if login_str.blank?
+        log_warn('JWT (JWKS fallback): no preferred_username or sub in token')
+        return nil
+      end
       payload
     end
 
